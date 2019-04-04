@@ -7,7 +7,7 @@ import sys
 
 def detectWink(frame, location, ROI, cascade):
     eyes = cascade.detectMultiScale(
-        ROI, 1.035, 7, 0|cv2.CASCADE_SCALE_IMAGE, minSize=(5, 5))
+        ROI, 1.15, 4, 0|cv2.CASCADE_SCALE_IMAGE, minSize=(5, 5))
 
     for e in eyes:
         e[0] += location[0]
@@ -21,17 +21,18 @@ def detectWink(frame, location, ROI, cascade):
 
 def detect(frame, faceCascade, eyes_cascade):
 
+
     gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
     # possible frame pre-processing:
-    # gray_frame = cv2.equalizeHist(gray_frame)
+    gray_frame = cv2.equalizeHist(gray_frame)
     # gray_frame = cv2.medianBlur(gray_frame, 5)
     # gray_frame = cv2.GaussianBlur(gray_frame,(5,5),0)
 
-    scaleFactor = 1.08 # range is from 1 to ..
+    scaleFactor = 1.15 # range is from 1 to ..
     minNeighbors = 3   # range is from 0 to ..
     flag = 0|cv2.CASCADE_SCALE_IMAGE # either 0 or 0|cv2.CASCADE_SCALE_IMAGE
-    minSize = (50,50) # range is from (0,0) to ..
+    minSize = (40,40) # range is from (0,0) to ..
     faces = faceCascade.detectMultiScale(
         gray_frame,
         scaleFactor,
@@ -39,9 +40,9 @@ def detect(frame, faceCascade, eyes_cascade):
         flag,
         minSize)
 
-    if len(faces) == 0:
+    if len(faces) == 0 or len(faces)>=2:
         face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades
-                                      + 'haarcascade_frontalface_alt2.xml')
+                                      + 'haarcascade_frontalface_alt.xml')
         faces = face_cascade.detectMultiScale(
             gray_frame,
             scaleFactor,
@@ -50,32 +51,43 @@ def detect(frame, faceCascade, eyes_cascade):
             minSize)
 
     detected = 0
+    if(len(faces)>2):
+        return 0
+
     for f in faces:
         x, y, w, h = f[0], f[1], f[2], f[3]
-        h=(int)(3*h/5)
-        faceROI = gray_frame[y:y+h, x:x+w]
+        cv2.rectangle(frame, (x,y), (x+w,y+h), (0,255, 0), 2)
+        h=int(h*3/5)
+
         faceColorROI = frame[y:y+h, x:x+w]
 
-        eyes = eyes_cascade.detectMultiScale(
-            faceColorROI, 1.15, 4, 0|cv2.CASCADE_SCALE_IMAGE, minSize=(5, 5))
 
-        if len(eyes) == 1 :
-            detected += 1
+        eyes = eyes_cascade.detectMultiScale(
+        faceColorROI, 1.15, 4, 0|cv2.CASCADE_SCALE_IMAGE, minSize=(5, 5))
+        flaga=0
+        if len(eyes)==1:
+            detected+=1
+            flaga=1
             detectWink(frame, (x, y), faceColorROI, eyes_cascade)
-            h=(int)(h*5/3)
-            cv2.rectangle(frame, (x,y), (x+w,y+h), (255, 0, 0), 2)
+
         else:
             eyes_cascade = cv2.CascadeClassifier(cv2.data.haarcascades
                                       + 'haarcascade_eye_tree_eyeglasses.xml')
-            tempColor = detectWink(frame, (x, y), faceColorROI, eyes_cascade)
-            h=(int)(h*5/3)
-            if tempColor > 0:
-                detected += 1
-                cv2.rectangle(frame, (x,y), (x+w,y+h), (255, 0, 0), 2)
-            else :
-                cv2.rectangle(frame, (x,y), (x+w,y+h), (0, 255, 0), 2)
-    return detected
+            eyes = eyes_cascade.detectMultiScale(
+            faceColorROI, 1.15, 4, 0|cv2.CASCADE_SCALE_IMAGE, minSize=(5, 5))
+            if len(eyes)==1 and flaga==0:
+                detected+=1
 
+                detectWink(frame, (x, y), faceColorROI, eyes_cascade)
+            else:
+
+                if len(eyes)==2:
+                    detectWink(frame, (x, y), faceColorROI, eyes_cascade)
+
+
+
+
+    return detected
 
 def run_on_folder(cascade1, cascade2, folder):
     if(folder[-1] != "/"):
@@ -94,7 +106,7 @@ def run_on_folder(cascade1, cascade2, folder):
             windowName = f
             cv2.namedWindow(windowName, cv2.WINDOW_AUTOSIZE)
             cv2.imshow(windowName, img)
-            cv2.waitKey(0)
+            cv2.waitKey()
     return totalCount
 
 def runonVideo(face_cascade, eyes_cascade):
